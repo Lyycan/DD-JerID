@@ -32,19 +32,6 @@ configs/
 The JerFace-LT dataset is released separately and is not part of this
 repository, which ships no imagery, annotations, splits or trained weights.
 
-## Citation
-
-```bibtex
-@article{ddjerid,
-  title   = {Long-term Cattle Face Recognition in a Changing Herd: A 29-month
-             Evaluation of a Doubly Decoupled Framework},
-  author  = {Lyycan},
-  note    = {https://github.com/Lyycan},
-  journal = {Computers and Electronics in Agriculture},
-  year    = {2026}
-}
-```
-
 ## Licence
 
 Apache-2.0 (`LICENSE`); upstream attribution in `NOTICE`.
