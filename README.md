@@ -49,13 +49,6 @@ Each period carries `images/`, an `annotations.json` in COCO format and a
 `metadata.jsonl` for `datasets.load_dataset("imagefolder", ...)`; `identities.csv`
 at the root lists which periods each animal appears in.
 
-The release is organised by period and carries no train/val/test split. The
-splits used in the paper are time-blocked rather than random, because frames were
-sampled about three seconds apart and a randomly held-out frame therefore has a
-near-duplicate in the training set. Split by contiguous time blocks or by video
-source; the split files themselves are available from the corresponding author on
-request.
-
 ## Licence
 
 Apache-2.0 (`LICENSE`); upstream attribution in `NOTICE`.
