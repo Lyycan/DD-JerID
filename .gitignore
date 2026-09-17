@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.pth
+*.onnx
+*.engine
+runs/
+outputs/

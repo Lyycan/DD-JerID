@@ -1,0 +1,7 @@
+# Identity half (protolora/) only. The detector half additionally needs DEIMv2
+# and its own requirements.
+torch>=2.0
+torchvision>=0.15
+timm>=1.0.7
+numpy>=1.24
+Pillow>=9.0

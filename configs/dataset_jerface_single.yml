@@ -1,0 +1,47 @@
+# Single-class (cow) detection split for one period of JerFace-LT.
+#
+# AgnoDet never predicts an identity, so the annotation files collapse every
+# individual to category_id 1. Point ann_file at the period you are training on;
+# file_name entries are absolute paths, which makes img_folder a placeholder.
+task: detection
+
+evaluator:
+  type: CocoEvaluator
+  iou_types: ['bbox', ]
+
+num_classes: 1
+remap_mscoco_category: False
+
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/JerFace-LT
+    ann_file: /path/to/JerFace-LT/splits/P1/train_single.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: True
+  num_workers: 4
+  drop_last: True
+  pin_memory: True
+  collate_fn:
+    type: BatchImageCollateFunction
+
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/JerFace-LT
+    ann_file: /path/to/JerFace-LT/splits/P1/val_single.json
+    return_masks: False
+    transforms:
+      type: Compose
+      ops: ~
+  shuffle: False
+  num_workers: 4
+  drop_last: False
+  pin_memory: True
+  collate_fn:
+    type: BatchImageCollateFunction

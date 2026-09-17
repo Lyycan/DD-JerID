@@ -1,0 +1,102 @@
+--- a/engine/backbone/dinov3_adapter.py
++++ b/engine/backbone/dinov3_adapter.py
+@@ -20,9 +20,10 @@
+ from functools import partial
+ from ..core import register
+ from .vit_tiny import VisionTransformer  
+-from ..logger_module import get_logger   
++from ..logger_module import get_logger
++from .gcf import GCF
+ 
+-logger = get_logger(__name__)  
++logger = get_logger(__name__)
+ 
+ class SpatialPriorModulev2(nn.Module):  
+     def __init__(self, inplanes=16):
+@@ -84,7 +85,10 @@
+         use_sta=True, 
+         conv_inplane=16,
+         hidden_dim=None,
+-    ):  
++        fusion_type='cat',       # 'cat' = upstream concat+1x1; 'gcf' = gated complementary fusion
++        fusion_scale_init=None,  # initial GCF residual scale (None keeps the module default)
++        freeze_backbone=False,   # freeze the whole backbone and train neck+decoder only
++    ):
+         super(DINOv3STAs, self).__init__()    
+         if 'dinov3' in name:
+             self.dinov3 = torch.hub.load('engine/dinov3_deimv2', name, source='local', weights=weights_path)
+@@ -118,19 +122,36 @@
+  
+         # linear projection 
+         hidden_dim = hidden_dim if hidden_dim is not None else embed_dim
+-        self.convs = nn.ModuleList([ 
+-            nn.Conv2d(embed_dim + conv_inplane*2, hidden_dim, kernel_size=1, stride=1, padding=0, bias=False),   
+-            nn.Conv2d(embed_dim + conv_inplane*4, hidden_dim, kernel_size=1, stride=1, padding=0, bias=False),
+-            nn.Conv2d(embed_dim + conv_inplane*4, hidden_dim, kernel_size=1, stride=1, padding=0, bias=False)
+-        ])    
++        self.fusion_type = fusion_type
++        # per-scale detail-stream channels produced by SpatialPriorModulev2
++        det_ch = [conv_inplane * 2, conv_inplane * 4, conv_inplane * 4] if use_sta else [0, 0, 0]
++
++        if fusion_type == 'cat':
++            self.convs = nn.ModuleList([
++                nn.Conv2d(embed_dim + det_ch[i], hidden_dim, kernel_size=1, stride=1, padding=0, bias=False)
++                for i in range(3)
++            ])
++        elif fusion_type == 'gcf':
++            assert use_sta, "fusion_type='gcf' requires the detail stream (use_sta=True)"
++            kw = {} if fusion_scale_init is None else {'residual_scale_init': fusion_scale_init}
++            self.fuse = nn.ModuleList([GCF([embed_dim, det_ch[i]], hidden_dim, **kw)
++                                       for i in range(3)])
++            logger.info(f"Using fusion module: GCF {kw or '(default residual scale)'}")
++        else:
++            raise ValueError(f"Unknown fusion_type: {fusion_type}")
+         # norm 
+         self.norms = nn.ModuleList([
+             nn.SyncBatchNorm(hidden_dim),
+-            nn.SyncBatchNorm(hidden_dim),     
+-            nn.SyncBatchNorm(hidden_dim) 
+-        ])   
++            nn.SyncBatchNorm(hidden_dim),
++            nn.SyncBatchNorm(hidden_dim)
++        ])
+ 
+-    def forward(self, x):   
++        if freeze_backbone:
++            for p in self.parameters():
++                p.requires_grad = False
++            logger.info("freeze_backbone=True: DINOv3STAs frozen, training neck+decoder only")
++
++    def forward(self, x):
+         # Code for matching with oss
+         H_c, W_c = x.shape[2] // 16, x.shape[3] // 16    
+         H_toks, W_toks = x.shape[2] // self.patch_size, x.shape[3] // self.patch_size
+@@ -155,17 +176,15 @@
+             sem_feat = F.interpolate(sem_feat, size=[resize_H, resize_W], mode="bilinear", align_corners=False) 
+             sem_feats.append(sem_feat)
+ 
+-        # fusion   
+-        fused_feats = []     
+-        if self.use_sta:
+-            detail_feats = self.sta(x) 
+-            for sem_feat, detail_feat in zip(sem_feats, detail_feats):
+-                fused_feats.append(torch.cat([sem_feat, detail_feat], dim=1))
+-        else:
+-            fused_feats = sem_feats     
++        # fusion
++        detail_feats = self.sta(x) if self.use_sta else [None, None, None]
++        feats = []
++        for i, sem_feat in enumerate(sem_feats):
++            if self.fusion_type == 'cat':
++                fused = torch.cat([sem_feat, detail_feats[i]], dim=1) if self.use_sta else sem_feat
++                feats.append(self.norms[i](self.convs[i](fused)))
++            else:
++                feats.append(self.norms[i](self.fuse[i]([sem_feat, detail_feats[i]])))
+ 
+-        c2 = self.norms[0](self.convs[0](fused_feats[0]))
+-        c3 = self.norms[1](self.convs[1](fused_feats[1]))    
+-        c4 = self.norms[2](self.convs[2](fused_feats[2]))   
+-     
+-        return c2, c3, c4    
++        c2, c3, c4 = feats
++        return c2, c3, c4

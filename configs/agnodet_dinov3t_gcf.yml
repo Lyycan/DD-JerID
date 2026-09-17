@@ -1,0 +1,106 @@
+# AgnoDet: identity-agnostic single-class cattle-face detector.
+#
+# Overlay on the upstream DEIMv2 DINOv3 ViT-Tiny recipe; the only change is that the
+# two backbone streams are merged by GCF instead of concatenation + 1x1 convolution.
+# Apply agnodet/dinov3_adapter.gcf.patch first, otherwise fusion_type is not recognised.
+#
+# Place this file and dataset_jerface_single.yml in DEIMv2/configs/agnodet/ so the
+# relative __include__ paths below resolve.
+__include__: [
+  './dataset_jerface_single.yml',
+  '../dataset/coco_detection.yml',
+  '../runtime.yml',
+  '../base/dataloader.yml',
+  '../base/optimizer.yml',
+  '../base/deimv2.yml',
+]
+
+output_dir: ./outputs/agnodet_dinov3t_gcf
+
+DEIM:
+  backbone: DINOv3STAs
+
+DINOv3STAs:
+  name: vit_tiny
+  embed_dim: 192
+  weights_path: ./weight/vitt_distill.pt
+  interaction_indexes: [5, 8, 11]   # the [1/8, 1/16, 1/32] taps
+  num_heads: 3
+  fusion_type: gcf
+  freeze_backbone: False
+
+HybridEncoderV2:
+  in_channels: [192, 192, 192]
+  depth_mult: 0.67
+  expansion: 0.34
+  hidden_dim: 192
+  dim_feedforward: 512
+
+DEIMV2Transformer:
+  feat_channels: [192, 192, 192]
+  hidden_dim: 192
+  dim_feedforward: 512
+  num_layers: 4
+  eval_idx: -1
+
+optimizer:
+  type: AdamW
+  params:
+    - params: '^(?=.*.dinov3)(?!.*(?:norm|bn|bias)).*$'
+      lr: 0.000025
+    - params: '^(?=.*.dinov3)(?=.*(?:norm|bn|bias)).*$'
+      lr: 0.000025
+      weight_decay: 0.
+    - params: '^(?=.*(?:sta|encoder|decoder))(?=.*(?:norm|bn|bias)).*$'
+      weight_decay: 0.
+  lr: 0.0005
+  betas: [0.9, 0.999]
+  weight_decay: 0.0001
+
+epoches: 132
+flat_epoch: 64
+no_aug_epoch: 12
+
+train_dataloader:
+  dataset:
+    transforms:
+      ops:
+        - {type: Mosaic, output_size: 320, rotation_range: 10, translation_range: [0.1, 0.1],
+           scaling_range: [0.5, 1.5], probability: 1.0, fill_value: 0, use_cache: True,
+           max_cached_images: 50, random_pop: True}
+        - {type: RandomPhotometricDistort, p: 0.5}
+        - {type: RandomZoomOut, fill: 0}
+        - {type: RandomIoUCrop, p: 0.8}
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: RandomHorizontalFlip}
+        - {type: Resize, size: [640, 640]}
+        - {type: SanitizeBoundingBoxes, min_size: 1}
+        - {type: ConvertPILImage, dtype: 'float32', scale: True}
+        - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+        - {type: ConvertBoxes, fmt: 'cxcywh', normalize: True}
+      policy:
+        epoch: [4, 64, 120]
+  collate_fn:
+    base_size: 640
+    mixup_prob: 0.5
+    ema_restart_decay: 0.9999
+    base_size_repeat: 20
+    mixup_epochs: [4, 64]
+    stop_epoch: 120
+    copyblend_epochs: [4, 120]
+  total_batch_size: 8
+
+val_dataloader:
+  dataset:
+    transforms:
+      ops:
+        - {type: Resize, size: [640, 640]}
+        - {type: ConvertPILImage, dtype: 'float32', scale: True}
+        - {type: Normalize, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225]}
+  total_batch_size: 8
+
+DEIMCriterion:
+  matcher:
+    change_matcher: True
+    iou_order_alpha: 4.0
+    matcher_change_epoch: 100

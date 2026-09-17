@@ -1,0 +1,22 @@
+DD-JerID
+Copyright 2026 DD-JerID authors (https://github.com/Lyycan)
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes a patch against, and context lines from, DEIMv2:
+
+  DEIMv2 — Copyright (c) 2025 The DEIMv2 Authors
+  https://github.com/Intellindust-AI-Lab/DEIMv2
+  Licensed under the Apache License, Version 2.0.
+  DEIMv2 builds on DEIM, D-FINE and RT-DETR (Apache-2.0,
+  Copyright 2023 lyuwenyu).
+
+agnodet/dinov3_adapter.gcf.patch modifies engine/backbone/dinov3_adapter.py
+from DEIMv2, adding a fusion_type argument. That file derives from DINOv3
+(Copyright (c) Meta Platforms, Inc. and affiliates), which is distributed under
+the DINOv3 License Agreement; its notices are left in place by the patch.
+
+Pretrained DINOv3 and DINOv2 weights are published by Meta Platforms under
+their respective licence terms and are not included here.
+
+timm (pytorch-image-models) — Copyright Ross Wightman, Apache-2.0.
