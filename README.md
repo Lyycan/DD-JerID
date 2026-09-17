@@ -29,8 +29,32 @@ configs/
 
 ## Data
 
-The JerFace-LT dataset is released separately and is not part of this
-repository, which ships no imagery, annotations, splits or trained weights.
+This repository ships no imagery, annotations, splits or trained weights. The
+dataset is released separately as **JerFace-LT**, at
+[huggingface.co/datasets/Lyycan/JerFace-LT](https://huggingface.co/datasets/Lyycan/JerFace-LT)
+under CC BY-SA 4.0, and becomes public once the paper is accepted.
+
+It holds four collection periods spanning about 29 months, 17,804 frames and
+96,430 boxes over 36 individuals, with identity labels keyed globally so that the
+same animal carries the same id in every period.
+
+```
+P1/  2023-06     9,679 frames  50,092 boxes  23 identities
+P2/  2024-10-28  2,630 frames  14,282 boxes  22 identities
+P3/  2024-10-30  3,075 frames  17,581 boxes  21 identities
+P4/  2025-11-02  2,420 frames  14,475 boxes  20 identities
+```
+
+Each period carries `images/`, an `annotations.json` in COCO format and a
+`metadata.jsonl` for `datasets.load_dataset("imagefolder", ...)`; `identities.csv`
+at the root lists which periods each animal appears in.
+
+The release is organised by period and carries no train/val/test split. The
+splits used in the paper are time-blocked rather than random, because frames were
+sampled about three seconds apart and a randomly held-out frame therefore has a
+near-duplicate in the training set. Split by contiguous time blocks or by video
+source; the split files themselves are available from the corresponding author on
+request.
 
 ## Licence
 
